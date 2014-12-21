@@ -22,7 +22,6 @@ function getSessionId() {
 
 function insertCurrentTimeDate() {
 	var date = new Date();
-	
 	$("#vitalDateHr").val(date.toJSON());
 }
 
@@ -89,6 +88,96 @@ function createMeasure(receivedData) {
 	var selEhrId = $("#ehrIdDropDown").val();
 	
 	sessionId = getSessionId();
+	
+	$.ajaxSetup({
+		headers: {"Ehr-Session": sessionId}
+	});
+	
+	var data = {
+		"ctx/language": "en",
+		"ctx/territory": "SI",
+		"ctx/time": receivedData.date,
+		"vital_signs/height_length/any_event/body_height_length": receivedData.height,
+		"vital_signs/body_weight/any_event/body_weight": receivedData.weight,
+		"vital_signs/body_temperature/any_event/temperature|magnitude": null, //receivedData.temp,
+		"vital_signs/body_temperature/any_event/temperature|unit": "°C",
+		"vital_signs/blood_pressure/any_event/systolic": receivedData.systolic,
+		"vital_signs/blood_pressure/any_event/diastolic": receivedData.diastolic,
+		"vital_signs/indirect_oximetry:0/spo2|numerator": receivedData.oxygen
+	};
+	
+	var myParams = {
+		"ehrId": selEhrId,
+		templateId: 'Vital Signs',
+		format: 'FLAT',
+		committer: "anon"
+	};
+	
+	$.ajax({
+		url: baseUrl + "/composition?" + $.param(myParams),
+		type: 'POST',
+		contentType: 'application/json',
+		data: JSON.stringify(data),
+		success: function (res) {
+			console.log(res.meta.href);
+			$("#addUserVitalMsg").html("<span class='obvestilo label label-success fade-in'>" + res.meta.href + ".</span>");
+			$("#allUsersDropDown").append("<option>" + selEhrId + "</option>");
+		},
+		error: function(err) {
+			$("#addUserVitalMsg").html("<span class='obvestilo label label-danger fade-in'>Napaka '" + JSON.parse(err.responseText).userMessage + "'!");
+			console.log(JSON.parse(err.responseText).userMessage);
+		}
+	});
+	
+}
+
+function readMeasure() {
+	
+	sessionId = getSessionId();
+	
+	var ehrId = $("#allUsersDropDown").val();
+	
+	if (ehrId.trim().length == 0) {
+		$("#showUserVitalMsg").html("<span class='obvestilo label label-warning fade-in'>Izberite EHR ID</span>");
+	
+	} else {
+		$.ajax({
+			url: baseUrl + "/demographics/ehr/" + ehrId + "/party",
+	    	type: 'GET',
+	    	headers: {"Ehr-Session": sessionId},
+	    	success: function (data) {
+				var party = data.party;
+				//$("#rezultatMeritveVitalnihZnakov").html("<br/><span>Pridobivanje podatkov za <b>'" + tip + "'</b> bolnika <b>'" + party.firstNames + " " + party.lastNames + "'</b>.</span><br/><br/>");
+				
+					$.ajax({
+					    url: baseUrl + "/view/" + ehrId + "/" + "weight",
+					    type: 'GET',
+					    headers: {"Ehr-Session": sessionId},
+					    success: function (res) {
+					    	if (res.length > 0) {
+						    	var results = "<table class='table table-striped table-hover'><tr><th>Datum in ura</th><th class='text-right'>Telesna teža</th></tr>";
+						        for (var i in res) {
+						            results += "<tr><td>" + res[i].time + "</td><td class='text-right'>" + res[i].weight + " " 	+ res[i].unit + "</td>";
+						        }
+						        results += "</table>";
+						        $("#results").append(results);
+					    	} else {
+					    		$("#showUserVitalMsg").html("<span class='obvestilo label label-warning fade-in'>Ni podatkov!</span>");
+					    	}
+					    },
+					    error: function() {
+					    	$("#showUserVitalMsg").html("<span class='obvestilo label label-danger fade-in'>Napaka '" + JSON.parse(err.responseText).userMessage + "'!");
+							console.log(JSON.parse(err.responseText).userMessage);
+					    }
+					});	
+				
+	    	},
+	    	error: function(err) {
+	    		$("#showUserVitalMsg").html("<span class='obvestilo label label-danger fade-in'>Napaka '" + JSON.parse(err.responseText).userMessage + "'!");
+				console.log(JSON.parse(err.responseText).userMessage);
+	    	}
+		});
+	}
 	
 }
 
